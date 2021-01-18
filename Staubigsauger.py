@@ -63,6 +63,7 @@ class WidgetSignal(QtWidgets.QWidget):
         self.sig = np.zeros((2, 1024))
         self.fn_signal = ""
         self.fs = 48000
+        self._percentage_quiet_magnitudes = 20
 
         _layout = QtWidgets.QVBoxLayout(self)
 
@@ -87,6 +88,17 @@ class WidgetSignal(QtWidgets.QWidget):
         _layout_filename_buttons = QtWidgets.QHBoxLayout()
 
         if can_calculate:
+            self._calc_slider = QtWidgets.QSlider(Qt.Horizontal)
+            self._calc_slider.setMinimum(1)
+            self._calc_slider.setMaximum(50)
+            self._calc_slider.valueChanged[int].connect(self._slider_changed)
+            _layout_filename_buttons.addWidget(self._calc_slider)
+
+            self._calc_slider_label = QtWidgets.QLabel()
+            _layout_filename_buttons.addWidget(self._calc_slider_label)
+
+            self._calc_slider.setValue(self._percentage_quiet_magnitudes)
+
             self._calc_button = QtWidgets.QPushButton("Calculate")
             self._calc_button.clicked.connect(self.calculationDesired.emit)
             _layout_filename_buttons.addWidget(self._calc_button)
@@ -104,6 +116,10 @@ class WidgetSignal(QtWidgets.QWidget):
             _layout_filename_buttons.addWidget(self._save_button)
 
         _layout_filename.addLayout(_layout_filename_buttons)
+
+    def _slider_changed(self, val):
+        self._percentage_quiet_magnitudes = val
+        self._calc_slider_label.setText(str(val) + "% of the quiet magnitudes")
 
     def set_data(self, data):
         self.sig = data.copy()
@@ -217,8 +233,11 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
             mag_rec1[chan, invalid] = the_max
 
             sorted_mag = np.sort(mag_rec1[chan], axis=1)
-            shrinked_mag = sorted_mag[:, :sorted_mag.shape[1]//4]
-            shrinked_mag = shrinked_mag[:, shrinked_mag.shape[1]//10:]
+            percentage_quiet_magnitudes = self.widgetSignalB._percentage_quiet_magnitudes / 100
+            max_len_quiet_magnitudes = int(sorted_mag.shape[1] * percentage_quiet_magnitudes)
+            max_len_quiet_magnitudes = max(1, max_len_quiet_magnitudes)
+            shrinked_mag = sorted_mag[:, :max_len_quiet_magnitudes]
+            # shrinked_mag = shrinked_mag[:, shrinked_mag.shape[1]//10:]
             med_mag = np.median(shrinked_mag, axis=1)*4
 
             # zzz_med_mag = np.median(mag_rec1[chan], axis=1)*4
