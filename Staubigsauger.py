@@ -46,21 +46,6 @@ def write_config() -> None:
         json.dump(_config, f, indent=2)
 
 
-def load_wave_file(path: str) -> np.ndarray:
-    try:
-        data, fs = soundfile.read(path)
-        data = data.T
-        if fs != 48000:
-            # TODO 2021-01-07 funktion zum resamplen implementieren
-            print(f"Cant read audio file at {path} with a samplerate of {fs}."
-                  f"Expected samplerate: {48000}")
-            return None
-        return data
-    except RuntimeError:
-        print(f"file not found: {path}")
-    return None
-
-
 def filter20_20k(x, sr):  # filters everything outside out 20 - 20000 Hz
     nyq = 0.5 * sr
     sos = scipy.signal.butter(5, [50.0 / nyq, 20000.0 / nyq], btype='band', output='sos')
@@ -77,6 +62,7 @@ class WidgetSignal(QtWidgets.QWidget):
 
         self.sig = np.zeros((2, 1024))
         self.fn_signal = ""
+        self.fs = 48000
 
         _layout = QtWidgets.QVBoxLayout(self)
 
@@ -126,7 +112,7 @@ class WidgetSignal(QtWidgets.QWidget):
 
     def update_plot(self):
         nfft = get_config()["NFFT"]
-        f, t, STFT = scipy.signal.stft(self.sig, 48000, window='hann', nperseg=nfft)
+        f, t, STFT = scipy.signal.stft(self.sig, self.fs, window='hann', nperseg=nfft)
         mag = np.abs(STFT)
         mag[mag < 1e-12] = 1e-12
         mag_log = 20*np.log10(mag)
@@ -139,7 +125,8 @@ class WidgetSignal(QtWidgets.QWidget):
     def open_file(self, fn_signal: str):
         self.fn_signal = fn_signal
         self._label_filename.setText(fn_signal)
-        data = load_wave_file(fn_signal)
+        data, fs = soundfile.read(fn_signal)
+        self.fs = fs
         self.set_data(data)
         self.signalFilenameChanged.emit(fn_signal)
 
@@ -153,7 +140,7 @@ class WidgetSignal(QtWidgets.QWidget):
 
     def save_file(self, fn_signal: str):
         self.fn_signal = fn_signal
-        soundfile.write(self.fn_signal, self.sig.T, 48000, subtype="PCM_32")
+        soundfile.write(self.fn_signal, self.sig.T, self.fs, subtype="PCM_32")
         self.signalFilenameChanged.emit(self.fn_signal)
 
     def _on_filedialog_save_file(self):
@@ -216,8 +203,8 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
 
         # attenuate noise
         sig = self.widgetSignalA.sig
+        fs = self.widgetSignalA.fs
         NFFT = get_config()["NFFT"]
-        fs = 48000
         f, t, Sxx_rec = scipy.signal.stft(sig, fs, window='hann', nperseg=NFFT)
         Sxx_rec = np.atleast_3d(Sxx_rec)
         mag_rec1 = np.abs(Sxx_rec)
