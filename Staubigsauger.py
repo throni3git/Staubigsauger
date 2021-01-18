@@ -222,6 +222,7 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
         Sxx_rec = np.atleast_3d(Sxx_rec)
         mag_rec1 = np.abs(Sxx_rec)
         mag_rec1[:, :, 1:] = mag_rec1[:, :, 1:]/2 + mag_rec1[:, :, :-1]/2
+        mag_rec1[:, :-1, :] = mag_rec1[:, :-1, :]/2 + mag_rec1[:, 1:, :]/2
         num_chan = mag_rec1.shape[0]
         for chan in range(num_chan):
             mag_rec1_larger_than_zero = mag_rec1[chan] > 0
