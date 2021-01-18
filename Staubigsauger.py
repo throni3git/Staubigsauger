@@ -147,8 +147,8 @@ class WidgetSignal(QtWidgets.QWidget):
         pn_before = Path(self.fn_signal if self.fn_signal is not None else __file__).parent
 
         fn_signal, _ = QtWidgets.QFileDialog.getOpenFileName(filter="*.wav", dir=str(pn_before))
-        self._label_filename.setText(fn_signal)
         if fn_signal is not "":
+            self._label_filename.setText(fn_signal)
             self.open_file(fn_signal)
 
     def save_file(self, fn_signal: str):
@@ -160,12 +160,12 @@ class WidgetSignal(QtWidgets.QWidget):
         pn_before = Path(self.fn_signal if self.fn_signal is not None else __file__).parent
 
         fn_signal, _ = QtWidgets.QFileDialog.getSaveFileName(filter="*.wav", dir=str(pn_before))
-        self._label_filename.setText(fn_signal)
         if fn_signal is "":
             return
         if not fn_signal.endswith(".wav"):
             fn_signal = fn_signal + ".wav"
         if fn_signal is not "":
+            self._label_filename.setText(fn_signal)
             self.save_file(fn_signal)
 
 
