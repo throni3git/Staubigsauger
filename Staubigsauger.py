@@ -225,16 +225,23 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
         mag_rec1[:, :-1, :] = mag_rec1[:, :-1, :]/2 + mag_rec1[:, 1:, :]/2
         num_chan = mag_rec1.shape[0]
         for chan in range(num_chan):
-            mag_rec1_larger_than_zero = mag_rec1[chan] > 0
             the_max = np.max(mag_rec1[chan])
-            mag_rec1_smaller_half_max = mag_rec1[chan] < the_max/10
-            # plt.imshow(np.squeeze(np.bitwise_and(mag_rec1_larger_than_zero, mag_rec1_smaller_half_max)))
-            mag_ranged = mag_rec1[chan, np.bitwise_and(mag_rec1_larger_than_zero, mag_rec1_smaller_half_max)]
+            invalid = mag_rec1[chan] == 0
+            mag_rec1[chan, invalid] = the_max
 
-            med_mag = np.median(mag_rec1[chan], axis=1)*4
+            sorted_mag = np.sort(mag_rec1[chan], axis=1)
+            shrinked_mag = sorted_mag[:, :sorted_mag.shape[1]//4]
+            shrinked_mag = shrinked_mag[:, shrinked_mag.shape[1]//10:]
+            med_mag = np.median(shrinked_mag, axis=1)*4
+
+            # zzz_med_mag = np.median(mag_rec1[chan], axis=1)*4
+            # erg = np.vstack((med_mag, zzz_med_mag)).T
+
             tiled = np.tile(med_mag, (Sxx_rec.shape[-1], 1)).T
             indexed = mag_rec1[chan] < tiled
             Sxx_rec[chan, indexed] = 0
+        # plt.plot(np.log10(erg + 1e-12)*20)
+        # plt.show()
 
         t_synth, x_synth = scipy.signal.istft(Sxx_rec, fs, window='hann', nperseg=NFFT)
 
