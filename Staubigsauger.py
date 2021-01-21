@@ -124,10 +124,14 @@ class WidgetSignal(QtWidgets.QWidget):
         nfft = get_config()["NFFT"]
         f, t, STFT = scipy.signal.stft(self.sig, self.fs, window='hann', nperseg=nfft)
         mag = np.abs(STFT)
-        mag[mag < 1e-12] = 1e-12
+        floor = 1e-12
+        mag[mag < floor] = floor
         mag_log = 20*np.log10(mag)
+        vmin = 20*np.log10(floor)
+        vmax = 0
 
-        self.axes.imshow(mag_log[0], aspect="auto", origin="lower", cmap="jet", interpolation="nearest")
+        self.axes.imshow(mag_log[0], aspect="auto", origin="lower", cmap="jet",
+                         interpolation="nearest", vmin=vmin, vmax=vmax)
 
         self.figure.canvas.draw()
         self.figure.canvas.flush_events()
