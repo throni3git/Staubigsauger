@@ -46,12 +46,6 @@ def write_config() -> None:
         json.dump(_config, f, indent=2)
 
 
-def filter20_20k(x, sr):  # filters everything outside out 20 - 20000 Hz
-    nyq = 0.5 * sr
-    sos = scipy.signal.butter(5, [50.0 / nyq, 20000.0 / nyq], btype='band', output='sos')
-    return scipy.signal.sosfilt(sos, x)
-
-
 class WidgetSignal(QtWidgets.QWidget):
 
     calculationDesired = Signal()
