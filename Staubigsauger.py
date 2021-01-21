@@ -222,6 +222,15 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
         f, t, Sxx_rec = scipy.signal.stft(sig, fs, window='hann', nperseg=NFFT)
         Sxx_rec = np.atleast_3d(Sxx_rec)
         mag_rec1 = np.abs(Sxx_rec)
+
+        mask = np.ones_like(Sxx_rec)
+        sf_len = 5
+        # smoothing_filter = 1-np.abs(np.linspace(-1+2/sf_len, 1-2/sf_len, sf_len))
+        smoothing_filter = 0.5 + 0.5*np.cos(np.linspace(-1, 1, sf_len+2)*np.pi)
+        smoothing_filter = smoothing_filter[1:-2]
+        smoothing_filter = np.outer(smoothing_filter, smoothing_filter)
+        smoothing_filter /= np.sum(smoothing_filter)
+
         mag_rec1[:, :, 1:] = mag_rec1[:, :, 1:]/2 + mag_rec1[:, :, :-1]/2
         mag_rec1[:, :-1, :] = mag_rec1[:, :-1, :]/2 + mag_rec1[:, 1:, :]/2
         num_chan = mag_rec1.shape[0]
@@ -243,7 +252,11 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
 
             tiled = np.tile(med_mag, (Sxx_rec.shape[-1], 1)).T
             indexed = mag_rec1[chan] < tiled
-            Sxx_rec[chan, indexed] = 0
+
+            mask[chan, indexed] = 0
+            mask[chan] = scipy.signal.fftconvolve(mask[chan], smoothing_filter, mode="same")
+            Sxx_rec[chan] *= mask[chan]
+
         # plt.plot(np.log10(erg + 1e-12)*20)
         # plt.show()
 
