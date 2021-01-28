@@ -275,6 +275,7 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
         # plt.show()
 
         t_synth, x_synth = scipy.signal.istft(Sxx_rec, fs, window='hann', nperseg=NFFT)
+        x_synth = x_synth[:, :sig.shape[1]]
 
         self.widgetSignalB.set_data(x_synth)
 
