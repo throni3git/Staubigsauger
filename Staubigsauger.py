@@ -130,8 +130,22 @@ class WidgetSignal(QtWidgets.QWidget):
         vmin = 20*np.log10(floor)
         vmax = 0
 
-        self.axes.imshow(mag_log[0], aspect="auto", origin="lower", cmap="jet",
-                         interpolation="nearest", vmin=vmin, vmax=vmax)
+        self.axes.imshow(mag_log[0],
+                         aspect="auto",
+                         origin="lower",
+                         cmap="jet",
+                         interpolation="nearest",
+                         vmin=vmin,
+                         vmax=vmax)
+        self.axes.grid(True, alpha=0.3)
+
+        self.axes.set_xlabel("time in s")
+        self.axes.set_xticks(np.arange(0, t[-1], 0.5) * self.fs * 2 / nfft)
+        self.axes.set_xticklabels(np.arange(0, t[-1], 0.5))
+
+        self.axes.set_ylabel("freq in kHz")
+        self.axes.set_yticks(np.arange(0, f[-1], 1000) * nfft / self.fs)
+        self.axes.set_yticklabels(np.arange(0, f[-1], 1000, dtype=np.int)//1000)
 
         self.figure.canvas.draw()
         self.figure.canvas.flush_events()
