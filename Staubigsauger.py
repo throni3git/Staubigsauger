@@ -17,16 +17,30 @@ import matplotlib.pyplot as plt
 
 import soundfile
 
-_config = {
+_default_config = {
     "filename_A": None,
     "filename_B": None,
-    "NFFT": 2048
+    "NFFT": 2048,
+    "n_std_mag": 1.5,
+    "percentage_quiet_magnitudes": 20
 }
 
+_config = _default_config.copy()
 
-def get_config():
-    global _config
-    return _config
+
+def get_config(key: str):
+    if key in _config:
+        return _config[key]
+    if key in _default_config:
+        return _default_config[key]
+
+    raise KeyError(f"Key {key} not found")
+
+
+def set_config(key: str, val) -> None:
+    if key not in _default_config:
+        raise KeyError(f"Key {key} not found in _default_config")
+    _config[key] = val
 
 
 def load_config() -> None:
@@ -57,7 +71,7 @@ class WidgetSignal(QtWidgets.QWidget):
         self.sig = np.zeros((2, 1024))
         self.fn_signal = ""
         self.fs = 48000
-        self._percentage_quiet_magnitudes = 20
+        self._percentage_quiet_magnitudes = get_config("percentage_quiet_magnitudes")
 
         _layout = QtWidgets.QVBoxLayout(self)
 
@@ -121,7 +135,7 @@ class WidgetSignal(QtWidgets.QWidget):
         self.update_plot()
 
     def update_plot(self):
-        nfft = get_config()["NFFT"]
+        nfft = get_config("NFFT")
         f, t, STFT = scipy.signal.stft(self.sig, self.fs, window='hann', nperseg=nfft)
         mag = np.abs(STFT)
         floor = 1e-12
@@ -209,22 +223,22 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
         layout.addWidget(self.widgetSignalB)
 
         # initial IR file loading
-        fn_wave = get_config()["filename_A"]
+        fn_wave = get_config("filename_A")
         if fn_wave == None:
             fn_wave = str(Path(__file__).parent / "example/A.wav")
         self.widgetSignalA.open_file(fn_wave)
 
-        fn_wave = get_config()["filename_B"]
+        fn_wave = get_config("filename_B")
         if fn_wave == None:
             fn_wave = str(Path(__file__).parent / "example/B.wav")
         self.widgetSignalB.open_file(fn_wave)
 
     def signalFilenameChangedA(self, fn_out: str):
-        get_config()["filename_A"] = fn_out
+        set_config("filename_A", fn_out)
         write_config()
 
     def signalFilenameChangedB(self, fn_out: str):
-        get_config()["filename_B"] = fn_out
+        set_config("filename_B", fn_out)
         write_config()
 
     def calculation_by_threshold(self):
@@ -232,7 +246,7 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
         # attenuate noise
         sig = self.widgetSignalA.sig
         fs = self.widgetSignalA.fs
-        NFFT = get_config()["NFFT"]
+        NFFT = get_config("NFFT")
         f, t, Sxx_rec = scipy.signal.stft(sig, fs, window='hann', nperseg=NFFT)
         Sxx_rec = np.atleast_3d(Sxx_rec)
         mag_rec1 = np.abs(Sxx_rec)
