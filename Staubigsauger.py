@@ -48,7 +48,7 @@ def write_config() -> None:
 
 class WidgetSignal(QtWidgets.QWidget):
 
-    calculationDesired = Signal()
+    calculationByThresholdDesired = Signal()
     signalFilenameChanged = Signal(str)
 
     def __init__(self, title: str, parent=None, can_open: bool = True, can_save: bool = True, can_calculate: bool = True):
@@ -94,7 +94,7 @@ class WidgetSignal(QtWidgets.QWidget):
             self._calc_slider.setValue(self._percentage_quiet_magnitudes)
 
             self._calc_button = QtWidgets.QPushButton("Calculate")
-            self._calc_button.clicked.connect(self.calculationDesired.emit)
+            self._calc_button.clicked.connect(self.calculationByThresholdDesired.emit)
             _layout_filename_buttons.addWidget(self._calc_button)
 
         _layout_filename_buttons.addStretch()
@@ -205,7 +205,7 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
 
         self.widgetSignalB = WidgetSignal("Signal B", can_open=False)
         self.widgetSignalB.signalFilenameChanged.connect(self.signalFilenameChangedB)
-        self.widgetSignalB.calculationDesired.connect(self.calculation)
+        self.widgetSignalB.calculationByThresholdDesired.connect(self.calculation_by_threshold)
         layout.addWidget(self.widgetSignalB)
 
         # initial IR file loading
@@ -227,7 +227,7 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
         get_config()["filename_B"] = fn_out
         write_config()
 
-    def calculation(self):
+    def calculation_by_threshold(self):
 
         # attenuate noise
         sig = self.widgetSignalA.sig
