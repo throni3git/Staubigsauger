@@ -167,9 +167,9 @@ class WidgetSignal(QtWidgets.QWidget):
     def open_file(self, fn_signal: str):
         self.fn_signal = fn_signal
         self._label_filename.setText(fn_signal)
-        data, fs = soundfile.read(fn_signal)
+        data, fs = soundfile.read(fn_signal, always_2d=True)
         self.fs = fs
-        self.set_data(data)
+        self.set_data(data.T)
         self.signalFilenameChanged.emit(fn_signal)
 
     def _on_filedialog_open_file(self):
