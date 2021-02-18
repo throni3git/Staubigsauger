@@ -72,6 +72,7 @@ class WidgetSignal(QtWidgets.QWidget):
         self.fn_signal = ""
         self.fs = 48000
         self._percentage_quiet_magnitudes = get_config("percentage_quiet_magnitudes")
+        self._std_mags = get_config("n_std_mag")
 
         _layout = QtWidgets.QVBoxLayout(self)
 
@@ -96,20 +97,45 @@ class WidgetSignal(QtWidgets.QWidget):
         _layout_filename_buttons = QtWidgets.QHBoxLayout()
 
         if can_calculate:
-            self._calc_slider = QtWidgets.QSlider(Qt.Horizontal)
-            self._calc_slider.setMinimum(1)
-            self._calc_slider.setMaximum(50)
-            self._calc_slider.valueChanged[int].connect(self._slider_changed)
-            _layout_filename_buttons.addWidget(self._calc_slider)
+            _layout_parameters = QtWidgets.QVBoxLayout()
 
-            self._calc_slider_label = QtWidgets.QLabel()
-            _layout_filename_buttons.addWidget(self._calc_slider_label)
+            # slider for adjusting the amount of samples in the quiet area used for threshold estimation
+            _layout_param1 = QtWidgets.QHBoxLayout()
+            self._slider_percent_quiet_mags = QtWidgets.QSlider(Qt.Horizontal)
+            self._slider_percent_quiet_mags.setMinimum(1)
+            self._slider_percent_quiet_mags.setMaximum(50)
+            self._slider_percent_quiet_mags.valueChanged[int].connect(self._slider_percent_quiet_mags_changed)
+            _layout_param1.addWidget(self._slider_percent_quiet_mags)
 
-            self._calc_slider.setValue(self._percentage_quiet_magnitudes)
+            self._slider_percent_quiet_mags_label = QtWidgets.QLabel()
+            _layout_param1.addWidget(self._slider_percent_quiet_mags_label)
+
+            self._slider_percent_quiet_mags.setValue(self._percentage_quiet_magnitudes)
 
             self._calc_button = QtWidgets.QPushButton("Calculate")
             self._calc_button.clicked.connect(self.calculationByThresholdDesired.emit)
-            _layout_filename_buttons.addWidget(self._calc_button)
+            _layout_param1.addWidget(self._calc_button)
+
+            # slider for adjusting the standard deviation used for threshold estimation
+            _layout_param2 = QtWidgets.QHBoxLayout()
+            self._slider_std_mags = QtWidgets.QSlider(Qt.Horizontal)
+            self._slider_std_mags.setMinimum(1)
+            self._slider_std_mags.setMaximum(400)
+            self._slider_std_mags.valueChanged[int].connect(self._slider_std_mags_changed)
+            _layout_param2.addWidget(self._slider_std_mags)
+
+            self._slider_std_mags_label = QtWidgets.QLabel()
+            _layout_param2.addWidget(self._slider_std_mags_label)
+
+            self._slider_std_mags.setValue(int(self._std_mags*100))
+
+            self._calc_button = QtWidgets.QPushButton("Calculate")
+            self._calc_button.clicked.connect(self.calculationByThresholdDesired.emit)
+            _layout_param2.addWidget(self._calc_button)
+
+            _layout_parameters.addLayout(_layout_param1)
+            _layout_parameters.addLayout(_layout_param2)
+            _layout_filename_buttons.addLayout(_layout_parameters)
 
         _layout_filename_buttons.addStretch()
 
@@ -125,9 +151,14 @@ class WidgetSignal(QtWidgets.QWidget):
 
         _layout_filename.addLayout(_layout_filename_buttons)
 
-    def _slider_changed(self, val):
+    def _slider_percent_quiet_mags_changed(self, val):
         self._percentage_quiet_magnitudes = val
-        self._calc_slider_label.setText(str(val) + "% of the quiet magnitudes")
+        self._slider_percent_quiet_mags_label.setText(f"{val} of the quiet magnitudes")
+
+    def _slider_std_mags_changed(self, val):
+        val /= 100
+        self._std_mags = val
+        self._slider_std_mags_label.setText(f"{val:.2f} times the std deviation")
 
     def set_data(self, data):
         self.sig = data.copy()
@@ -247,9 +278,12 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
         sig = self.widgetSignalA.sig
         fs = self.widgetSignalA.fs
         NFFT = get_config("NFFT")
+        n_std_mag = self.widgetSignalB._std_mags
+        percentage_quiet_magnitudes = self.widgetSignalB._percentage_quiet_magnitudes / 100
+
         f, t, Sxx_rec = scipy.signal.stft(sig, fs, window='hann', nperseg=NFFT)
         Sxx_rec = np.atleast_3d(Sxx_rec)
-        mag_rec1 = np.abs(Sxx_rec)
+        mag_rec_db = 20 * np.log10(np.abs(Sxx_rec) + 1e-10)
 
         mask = np.ones_like(Sxx_rec)
         sf_len = 5
@@ -259,27 +293,44 @@ class MainStaubigsauger(QtWidgets.QMainWindow):
         smoothing_filter = np.outer(smoothing_filter, smoothing_filter)
         smoothing_filter /= np.sum(smoothing_filter)
 
-        mag_rec1[:, :, 1:] = mag_rec1[:, :, 1:]/2 + mag_rec1[:, :, :-1]/2
-        mag_rec1[:, :-1, :] = mag_rec1[:, :-1, :]/2 + mag_rec1[:, 1:, :]/2
-        num_chan = mag_rec1.shape[0]
-        for chan in range(num_chan):
-            the_max = np.max(mag_rec1[chan])
-            invalid = mag_rec1[chan] == 0
-            mag_rec1[chan, invalid] = the_max
+        # smoove input signal spectrogram a little bit
+        # mag_rec_db[:, :, 1:] = mag_rec_db[:, :, 1:]/2 + mag_rec_db[:, :, :-1]/2
+        # mag_rec_db[:, :-1, :] = mag_rec_db[:, :-1, :]/2 + mag_rec_db[:, 1:, :]/2
 
-            sorted_mag = np.sort(mag_rec1[chan], axis=1)
-            percentage_quiet_magnitudes = self.widgetSignalB._percentage_quiet_magnitudes / 100
+        num_chan = mag_rec_db.shape[0]
+        for chan in range(num_chan):
+            # nullen aus der wertung nehmen
+            the_max = np.max(mag_rec_db[chan])
+            invalid = mag_rec_db[chan] <= -200
+            mag_rec_db[chan, invalid] = the_max
+
+            # use blocks where the energy overall is smallest
+            E = np.mean(mag_rec_db[chan], axis=0)
+            E_sorted = np.argsort(E)
+            E_sorted_shrinked = E_sorted[:int(E_sorted.shape[0] * percentage_quiet_magnitudes)]
+            shrinked_mag_db = mag_rec_db[chan, :, E_sorted_shrinked].T
+
+            sorted_mag = np.sort(mag_rec_db[chan], axis=1)
             max_len_quiet_magnitudes = int(sorted_mag.shape[1] * percentage_quiet_magnitudes)
             max_len_quiet_magnitudes = max(1, max_len_quiet_magnitudes)
-            shrinked_mag = sorted_mag[:, :max_len_quiet_magnitudes]
+            # shrinked_mag_db = sorted_mag[:, :max_len_quiet_magnitudes]
             # shrinked_mag = shrinked_mag[:, shrinked_mag.shape[1]//10:]
-            med_mag = np.median(shrinked_mag, axis=1)*4
 
-            # zzz_med_mag = np.median(mag_rec1[chan], axis=1)*4
-            # erg = np.vstack((med_mag, zzz_med_mag)).T
+            med_mag = np.median(shrinked_mag_db, axis=1)
+            print("Statistics")
+            print(f"  MEDIAN: {np.mean(med_mag)}")
 
-            tiled = np.tile(med_mag, (Sxx_rec.shape[-1], 1)).T
-            indexed = mag_rec1[chan] < tiled
+            # attempt like in https://timsainburg.com/noise-reduction-python.html
+            mean_mag_db = np.mean(shrinked_mag_db, axis=1)
+            std_mag_db = np.std(shrinked_mag_db, axis=1)
+            noise_floor_db = mean_mag_db + std_mag_db * n_std_mag
+
+            print(f"  Mean: {np.mean(mean_mag_db)}")
+            print(f"  Std: {np.mean(std_mag_db)}")
+            print(f"  Noise: {np.mean(noise_floor_db)}")
+
+            tiled = np.tile(noise_floor_db, (Sxx_rec.shape[-1], 1)).T
+            indexed = mag_rec_db[chan] < tiled
 
             mask[chan, indexed] = 0
             mask[chan] = scipy.signal.fftconvolve(mask[chan], smoothing_filter, mode="same")
